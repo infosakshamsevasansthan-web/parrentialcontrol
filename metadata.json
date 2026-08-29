@@ -1,0 +1,6 @@
+{
+  "name": "GuardianLink Parental Control & Monitoring Suite",
+  "description": "Comprehensive parental control admin panel and stealth Android child activity tracker with real-time GPS, live camera/mic streaming, screen mirroring, call/SMS logs, app lockdown, and remote management.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
