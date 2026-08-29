@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { MonitoringProvider, useMonitoring } from './context/MonitoringContext';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -12,21 +12,45 @@ import { KeyloggerNotificationsView } from './components/views/KeyloggerNotifica
 import { SecurityRemoteView } from './components/views/SecurityRemoteView';
 import { InstallGuideView } from './components/views/InstallGuideView';
 import { ChildPhoneSimulator } from './components/child_simulator/ChildPhoneSimulator';
+import { ChildTargetApp } from './components/child_device/ChildTargetApp';
 import { AddDeviceModal } from './components/modals/AddDeviceModal';
 import { EmergencyLockModal } from './components/modals/EmergencyLockModal';
 import { DataBackupModal } from './components/modals/DataBackupModal';
 import { ApkDownloadModal } from './components/modals/ApkDownloadModal';
 import { InstallPwaModal } from './components/modals/InstallPwaModal';
+import { Smartphone, ShieldCheck, ArrowRight, RefreshCw, Sparkles } from 'lucide-react';
 
 const MainDashboardLayout: React.FC = () => {
   const { activeTab, currentTab, setActiveTab } = useMonitoring();
-  const [showInstallPwaModal, setShowInstallPwaModal] = React.useState(false);
+  const [showInstallPwaModal, setShowInstallPwaModal] = useState(false);
+  const [appMode, setAppMode] = useState<'parent' | 'child'>(() => {
+    return (localStorage.getItem('guardian_app_mode') as 'parent' | 'child') || 'parent';
+  });
 
-  React.useEffect(() => {
+  useEffect(() => {
+    localStorage.setItem('guardian_app_mode', appMode);
+  }, [appMode]);
+
+  useEffect(() => {
     const handleOpenInstall = () => setShowInstallPwaModal(true);
+    const handleSwitchToChild = () => setAppMode('child');
+    const handleSwitchToParent = () => setAppMode('parent');
+
     window.addEventListener('open-pwa-install', handleOpenInstall);
-    return () => window.removeEventListener('open-pwa-install', handleOpenInstall);
+    window.addEventListener('switch-to-child-mode', handleSwitchToChild);
+    window.addEventListener('switch-to-parent-mode', handleSwitchToParent);
+
+    return () => {
+      window.removeEventListener('open-pwa-install', handleOpenInstall);
+      window.removeEventListener('switch-to-child-mode', handleSwitchToChild);
+      window.removeEventListener('switch-to-parent-mode', handleSwitchToParent);
+    };
   }, []);
+
+  // IF USER SELECTED CHILD TARGET DEVICE MODE (Installed on Child's Phone)
+  if (appMode === 'child') {
+    return <ChildTargetApp onSwitchToParent={() => setAppMode('parent')} />;
+  }
 
   const effectiveTab = activeTab || currentTab || 'dashboard';
 
@@ -58,25 +82,47 @@ const MainDashboardLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-[#0f172a] text-slate-100 font-sans overflow-hidden select-none">
-      {/* Navigation Sidebar */}
-      <Sidebar activeTab={effectiveTab} setActiveTab={setActiveTab} />
+    <div className="flex h-screen bg-[#0f172a] text-slate-100 font-sans overflow-hidden select-none flex-col">
+      {/* Mobile Top Mode Switcher Bar */}
+      <div className="bg-gradient-to-r from-blue-900/90 via-indigo-900/90 to-purple-900/90 border-b border-blue-500/30 px-3 py-1.5 flex items-center justify-between text-xs z-30 shrink-0">
+        <div className="flex items-center space-x-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="font-semibold text-white">App Mode:</span>
+          <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded border border-blue-400/30 font-bold">
+            👑 Parent Admin Dashboard
+          </span>
+        </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Global Control Header */}
-        <Header />
-
-        {/* Dynamic Viewport */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
-          <div className="max-w-7xl mx-auto">
-            {renderActiveView()}
-          </div>
-        </main>
+        <button
+          onClick={() => setAppMode('child')}
+          className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-[11px] flex items-center space-x-1 transition shadow"
+          title="Switch to Child Target Phone Mode"
+        >
+          <Smartphone className="w-3.5 h-3.5" />
+          <span>Switch to Child Phone Mode 📱</span>
+        </button>
       </div>
 
-      {/* Interactive Floating Child Smartphone Simulator */}
-      <ChildPhoneSimulator />
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Navigation Sidebar */}
+        <Sidebar activeTab={effectiveTab} setActiveTab={setActiveTab} />
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          {/* Global Control Header */}
+          <Header />
+
+          {/* Dynamic Viewport */}
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
+            <div className="max-w-7xl mx-auto">
+              {renderActiveView()}
+            </div>
+          </main>
+        </div>
+
+        {/* Interactive Floating Child Smartphone Simulator */}
+        <ChildPhoneSimulator />
+      </div>
 
       {/* Global Modals */}
       <AddDeviceModal />
