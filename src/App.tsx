@@ -24,7 +24,17 @@ const MainDashboardLayout: React.FC = () => {
   const { activeTab, currentTab, setActiveTab } = useMonitoring();
   const [showInstallPwaModal, setShowInstallPwaModal] = useState(false);
   const [appMode, setAppMode] = useState<'parent' | 'child'>(() => {
-    return (localStorage.getItem('guardian_app_mode') as 'parent' | 'child') || 'parent';
+    const saved = localStorage.getItem('guardian_app_mode');
+    if (saved === 'parent' || saved === 'child') return saved;
+    // Default to 'child' setup app when opened on Android APK / Mobile devices
+    if (typeof window !== 'undefined') {
+      const isMobileDevice =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        window.innerWidth < 768 ||
+        !!(window as any).Capacitor;
+      if (isMobileDevice) return 'child';
+    }
+    return 'parent';
   });
 
   useEffect(() => {

