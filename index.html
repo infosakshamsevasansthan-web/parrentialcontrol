@@ -38,6 +38,17 @@
     <script>
       window.addEventListener('error', function(e) {
         console.error('Root window error:', e);
+        var root = document.getElementById('root');
+        if (root && (!root.children || root.children.length === 0 || root.innerText.indexOf('GuardianLink Loading') !== -1)) {
+          root.innerHTML = '<div style="min-height:100vh;background:#090e1a;color:#f87171;padding:24px;font-family:system-ui;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;">' +
+            '<div style="font-size:32px;margin-bottom:12px;">⚠️</div>' +
+            '<h2 style="color:#fff;font-size:18px;margin-bottom:8px;">GuardianLink Display Rescue</h2>' +
+            '<p style="color:#94a3b8;font-size:13px;max-width:320px;margin-bottom:16px;">' + (e && e.message ? e.message : 'Loading error detected.') + '</p>' +
+            '<div style="display:flex;gap:10px;">' +
+            '<button onclick="localStorage.setItem(\'guardian_app_mode\',\'parent\');location.reload();" style="background:#2563eb;color:#fff;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;font-size:13px;">Parent Admin</button>' +
+            '<button onclick="localStorage.setItem(\'guardian_app_mode\',\'child\');location.reload();" style="background:#f59e0b;color:#000;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;font-size:13px;">Child Mode</button>' +
+            '</div></div>';
+        }
       });
     </script>
     <script type="module" src="/src/main.tsx"></script>

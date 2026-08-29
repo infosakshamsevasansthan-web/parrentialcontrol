@@ -106,6 +106,7 @@ interface MonitoringContextType {
   exportDataPackage: (format: 'json' | 'csv' | 'summary') => void;
   addGeofence: (geofence: Omit<GeofenceZone, 'id'>) => void;
   deleteGeofence: (id: string) => void;
+  triggerSosAlert: (message: string) => void;
 }
 
 const MonitoringContext = createContext<MonitoringContextType | undefined>(undefined);
@@ -119,11 +120,19 @@ export const MonitoringProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const currentTab = activeTab;
 
   const [devices, setDevices] = useState<Device[]>(() => {
-    const saved = localStorage.getItem('guardian_devices');
-    return saved ? JSON.parse(saved) : INITIAL_DEVICES;
+    try {
+      const saved = localStorage.getItem('guardian_devices');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_DEVICES;
   });
   
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>(INITIAL_DEVICES[0].id);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>(() => {
+    return INITIAL_DEVICES[0]?.id || 'dev-1';
+  });
   const [geofences, setGeofences] = useState<GeofenceZone[]>(INITIAL_GEOFENCES);
   const [callLogs, setCallLogs] = useState<CallLog[]>(INITIAL_CALL_LOGS);
   const [messages, setMessages] = useState<SMSMessage[]>(INITIAL_MESSAGES);
@@ -161,11 +170,13 @@ export const MonitoringProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const recTimerRef = useRef<any>(null);
   const sirenAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const selectedDevice = devices.find(d => d.id === selectedDeviceId) || devices[0];
+  const selectedDevice = devices.find(d => d.id === selectedDeviceId) || devices[0] || INITIAL_DEVICES[0];
 
-  // Save devices in localStorage
+  // Save devices in localStorage safely
   useEffect(() => {
-    localStorage.setItem('guardian_devices', JSON.stringify(devices));
+    try {
+      localStorage.setItem('guardian_devices', JSON.stringify(devices));
+    } catch {}
   }, [devices]);
 
   // Audio recording timer counter
@@ -627,6 +638,11 @@ DeviceBindEndpoint: wss://guardianlink.app/stream/v1
     setGeofences(prev => prev.filter(g => g.id !== id));
   }, []);
 
+  const triggerSosAlert = useCallback((message: string) => {
+    addActivityLog('🚨 EMERGENCY SOS TRIGGERED', message, 'security', 'critical');
+    setIsSirenPlaying(true);
+  }, [addActivityLog]);
+
   return (
     <MonitoringContext.Provider
       value={{
@@ -705,7 +721,8 @@ DeviceBindEndpoint: wss://guardianlink.app/stream/v1
         simulateChildAction,
         exportDataPackage,
         addGeofence,
-        deleteGeofence
+        deleteGeofence,
+        triggerSosAlert
       }}
     >
       {children}

@@ -137,9 +137,11 @@ export const ChildTargetApp: React.FC<ChildTargetAppProps> = ({ onSwitchToParent
   };
 
   const handleSendSos = () => {
-    triggerSosAlert(
-      `🚨 EMERGENCY SOS from Child Phone (${selectedDevice.childName})! Real Location: ${realLocation ? `${realLocation.lat.toFixed(4)}, ${realLocation.lng.toFixed(4)}` : 'Live GPS active'}`
-    );
+    if (typeof triggerSosAlert === 'function') {
+      triggerSosAlert(
+        `🚨 EMERGENCY SOS from Child Phone (${selectedDevice?.childName || 'Child Device'})! Real Location: ${realLocation ? `${realLocation.lat.toFixed(4)}, ${realLocation.lng.toFixed(4)}` : 'Live GPS active'}`
+      );
+    }
     setSosSent(true);
     setTimeout(() => setSosSent(false), 5000);
   };
