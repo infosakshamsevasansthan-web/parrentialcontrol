@@ -16,9 +16,18 @@ import { AddDeviceModal } from './components/modals/AddDeviceModal';
 import { EmergencyLockModal } from './components/modals/EmergencyLockModal';
 import { DataBackupModal } from './components/modals/DataBackupModal';
 import { ApkDownloadModal } from './components/modals/ApkDownloadModal';
+import { InstallPwaModal } from './components/modals/InstallPwaModal';
 
 const MainDashboardLayout: React.FC = () => {
   const { activeTab, currentTab, setActiveTab } = useMonitoring();
+  const [showInstallPwaModal, setShowInstallPwaModal] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleOpenInstall = () => setShowInstallPwaModal(true);
+    window.addEventListener('open-pwa-install', handleOpenInstall);
+    return () => window.removeEventListener('open-pwa-install', handleOpenInstall);
+  }, []);
+
   const effectiveTab = activeTab || currentTab || 'dashboard';
 
   const renderActiveView = () => {
@@ -74,6 +83,10 @@ const MainDashboardLayout: React.FC = () => {
       <EmergencyLockModal />
       <DataBackupModal />
       <ApkDownloadModal />
+      <InstallPwaModal
+        isOpen={showInstallPwaModal}
+        onClose={() => setShowInstallPwaModal(false)}
+      />
     </div>
   );
 };

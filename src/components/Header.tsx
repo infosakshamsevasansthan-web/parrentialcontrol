@@ -143,6 +143,19 @@ export const Header: React.FC = () => {
           </button>
         )}
 
+        {/* Install PWA App Button */}
+        <button
+          onClick={() => {
+            const event = new CustomEvent('open-pwa-install');
+            window.dispatchEvent(event);
+          }}
+          className="px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition shadow"
+          title="Install app on your phone"
+        >
+          <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="hidden sm:inline">Install App</span>
+        </button>
+
         {/* Download APK File Quick Action */}
         <button
           onClick={() => setShowApkModal(true)}
