@@ -18,27 +18,28 @@ import { EmergencyLockModal } from './components/modals/EmergencyLockModal';
 import { DataBackupModal } from './components/modals/DataBackupModal';
 import { ApkDownloadModal } from './components/modals/ApkDownloadModal';
 import { InstallPwaModal } from './components/modals/InstallPwaModal';
-import { Smartphone, ShieldCheck, ArrowRight, RefreshCw, Sparkles } from 'lucide-react';
+import { Smartphone, ShieldCheck, ArrowRight, Menu, X } from 'lucide-react';
 
 const MainDashboardLayout: React.FC = () => {
   const { activeTab, currentTab, setActiveTab } = useMonitoring();
   const [showInstallPwaModal, setShowInstallPwaModal] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  
   const [appMode, setAppMode] = useState<'parent' | 'child'>(() => {
-    const saved = localStorage.getItem('guardian_app_mode');
-    if (saved === 'parent' || saved === 'child') return saved;
-    // Default to 'child' setup app when opened on Android APK / Mobile devices
-    if (typeof window !== 'undefined') {
-      const isMobileDevice =
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-        window.innerWidth < 768 ||
-        !!(window as any).Capacitor;
-      if (isMobileDevice) return 'child';
-    }
+    try {
+      const saved = localStorage.getItem('guardian_app_mode');
+      if (saved === 'parent' || saved === 'child') return saved;
+      if (typeof window !== 'undefined' && (window as any).Capacitor) {
+        return 'child';
+      }
+    } catch {}
     return 'parent';
   });
 
   useEffect(() => {
-    localStorage.setItem('guardian_app_mode', appMode);
+    try {
+      localStorage.setItem('guardian_app_mode', appMode);
+    } catch {}
   }, [appMode]);
 
   useEffect(() => {
@@ -93,12 +94,21 @@ const MainDashboardLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-[#0f172a] text-slate-100 font-sans overflow-hidden select-none flex-col">
-      {/* Mobile Top Mode Switcher Bar */}
-      <div className="bg-gradient-to-r from-blue-900/90 via-indigo-900/90 to-purple-900/90 border-b border-blue-500/30 px-3 py-1.5 flex items-center justify-between text-xs z-30 shrink-0">
+      {/* Top Mode Bar */}
+      <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 border-b border-slate-800 px-3 py-2 flex items-center justify-between text-xs z-30 shrink-0">
         <div className="flex items-center space-x-2">
+          {/* Mobile Menu Toggle Button */}
+          <button
+            onClick={() => setMobileNavOpen(!mobileNavOpen)}
+            className="md:hidden p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition"
+            title="Toggle Menu"
+          >
+            {mobileNavOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+          </button>
+
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="font-semibold text-white">App Mode:</span>
-          <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded border border-blue-400/30 font-bold">
+          <span className="font-bold text-white hidden sm:inline">GuardianLink:</span>
+          <span className="bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded border border-blue-400/30 font-bold text-[11px]">
             👑 Parent Admin Dashboard
           </span>
         </div>
@@ -109,13 +119,35 @@ const MainDashboardLayout: React.FC = () => {
           title="Switch to Child Target Phone Mode"
         >
           <Smartphone className="w-3.5 h-3.5" />
-          <span>Switch to Child Phone Mode 📱</span>
+          <span>Child Phone Mode 📱</span>
         </button>
       </div>
 
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Navigation Sidebar */}
-        <Sidebar activeTab={effectiveTab} setActiveTab={setActiveTab} />
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
+        {/* Navigation Sidebar: Desktop fixed & Mobile slide-over */}
+        <div
+          className={`${
+            mobileNavOpen
+              ? 'absolute inset-y-0 left-0 z-50 flex shadow-2xl transition-transform duration-200 ease-in-out'
+              : 'hidden md:flex'
+          } h-full`}
+        >
+          <Sidebar
+            activeTab={effectiveTab}
+            setActiveTab={(tab) => {
+              setActiveTab(tab);
+              setMobileNavOpen(false);
+            }}
+          />
+        </div>
+
+        {/* Backdrop for mobile menu */}
+        {mobileNavOpen && (
+          <div
+            onClick={() => setMobileNavOpen(false)}
+            className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
+          />
+        )}
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -123,7 +155,7 @@ const MainDashboardLayout: React.FC = () => {
           <Header />
 
           {/* Dynamic Viewport */}
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
+          <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 custom-scrollbar">
             <div className="max-w-7xl mx-auto">
               {renderActiveView()}
             </div>
